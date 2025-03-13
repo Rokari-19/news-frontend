@@ -3,7 +3,7 @@
     <div class>
       <router-link to="/">Home</router-link> |
       <router-link to="/Search">Search</router-link> |
-      <router-link to="/Tags">Tags</router-link>
+      <router-link to="/tags">Tags</router-link>
     </div>
   </nav>
   <router-view/>
