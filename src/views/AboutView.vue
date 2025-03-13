@@ -11,6 +11,10 @@
         <button @click="fetchNews" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
           Search
         </button>
+
+        <router-link to="/news/create" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+          Create
+        </router-link>
       </div>
 
 
@@ -18,7 +22,7 @@
         <h3 class="text-xl font-semibold mb-2">Results:</h3>
         <div v-for="news in newsItems" :key="news.id" class="bg-gray-50 p-4 mb-3 rounded-lg shadow-sm">
           <h4 class="text-lg font-bold">{{ news.title }}</h4>
-          <p class="text-gray-700">{{ news.content }}</p>
+          <!-- <p class="text-gray-700">{{ news.content }}</p> -->
           <p class="mt-2 text-sm text-gray-500">
 
             <span v-for="tag in news.tag" :key="tag.id"
