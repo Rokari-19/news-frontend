@@ -19,7 +19,7 @@
                 <!-- Like/Dislike Section -->
                 <div class="mt-6 flex space-x-4">
                     <button @click="likeNews"
-                        class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-green-600 flex items-center">
+                        class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center">
                         Like: {{ newsItem.likes }}
                     </button>
 
@@ -30,8 +30,7 @@
                 </div>
 
                 <!-- Delete Button -->
-                <button @click="confirmDelete"
-                    class="mt-6 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600">
+                <button @click="confirmDelete" class="mt-6 bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600">
                     Delete News
                 </button>
             </div>
@@ -56,6 +55,28 @@
                 </div>
             </div>
         </div>
+        <div v-if="newsItem" class="mt-8">
+            <h3 class="text-2xl text-gray-300 font-bold">Comments</h3>
+
+            <!-- Comment Form -->
+            <form @submit.prevent="submitComment" class="mt-4">
+                <textarea v-model="newComment" placeholder="Write your comment..."
+                    class="w-full p-2 rounded-md bg-gray-600 text-white"></textarea>
+                <button type="submit" class="mt-2 bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                    Submit Comment
+                </button>
+            </form>
+
+            <!-- Display Comments -->
+            <div v-if="comments.length" class="mt-6">
+                <div v-for="comment in comments" :key="comment.id" class="bg-gray-600 p-4 rounded-md mt-4">
+                    <p class="text-white">{{ comment.comment }}</p>
+                    <p class="text-sm text-gray-400 mt-2">Posted on {{ new Date(comment.created_at).toLocaleString() }}
+                    </p>
+                </div>
+            </div>
+            <p v-else class="text-gray-400 mt-4">No comments yet.</p>
+        </div>
     </div>
 </template>
 
@@ -69,6 +90,9 @@ export default {
             newsItem: null,
             loading: true,
             showDeleteModal: false,
+            socket: null,
+            newComment: '',
+            comments: [],
         };
     },
     async created() {
@@ -76,34 +100,88 @@ export default {
         const newsId = route.params.id;
 
         try {
-            const response = await axios.get(`/api/v1/news/get/${newsId}/`);
-            this.newsItem = response.data;
+            const [newsResponse, commentsResponse] = await Promise.all([
+                axios.get(`/api/v1/news/get/${newsId}/`),
+                axios.get(`/api/v1/news/get/${newsId}/comments/`),
+            ]);
+            this.newsItem = newsResponse.data;
+            this.comments = commentsResponse.data.results;
+            // console.log(this.comments)
             document.title = this.newsItem.title;
+            this.initializeWebSocket(newsId);
         } catch (error) {
-            console.error("Error fetching news item:", error);
+            console.error("Error fetching data:", error);
         } finally {
             this.loading = false;
         }
     },
+
+    beforeUnmount() {
+        if (this.socket) {
+            this.socket.close();
+        }
+    },
     methods: {
+        initializeWebSocket(newsId) {
+            this.socket = new WebSocket(`ws://localhost:8000/ws/likes_dislikes/${newsId}/`);
+
+            this.socket.onopen = () => {
+                console.log('WebSocket connection established.');
+            };
+
+            this.socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.likes !== undefined) {
+                    this.newsItem.likes = data.likes;
+                }
+                if (data.dislikes !== undefined) {
+                    this.newsItem.dislikes = data.dislikes;
+                }
+                if (data.type === 'comment_added') {
+                    this.comments.push(data.comment)
+                }
+            };
+
+            this.socket.onclose = (event) => {
+                console.log('WebSocket connection closed:', event);
+            };
+        },
+        async submitComment() {
+            if (!this.newComment.trim()) {
+                alert("Comment cannot be empty.");
+                return;
+            }
+
+            try {
+                const response = await axios.post(`/api/v1/comment/${this.newsItem.id}/create/`, {
+                    comment: this.newComment,
+                    post: this.newsItem.id,
+                });
+
+                this.comments.push(response.data);
+                this.newComment = '';
+            } catch (error) {
+                console.error("Error submitting comment:", error);
+                alert("Failed to submit comment.");
+            }
+        },
+
         async likeNews() {
             try {
-                const response = await axios.post(`/api/v1/news/${this.newsItem.id}/like/`);
-                if (response.data && response.data.likes !== undefined) {
-                    this.newsItem.likes = response.data.likes;
-                    this.newsItem = { ...this.newsItem }; // Force reactivity
-                }
+                await axios.post(`/api/v1/news/${this.newsItem.id}/like/`).then(response => {
+                    // console.log(response.data)
+
+                });
+
             } catch (error) {
                 console.error("Error liking news item:", error);
             }
         },
         async dislikeNews() {
             try {
-                const response = await axios.post(`/api/v1/news/${this.newsItem.id}/dislike/`);
-                if (response.data && response.data.dislikes !== undefined) {
-                    this.newsItem.dislikes = response.data.dislikes;
-                    this.newsItem = { ...this.newsItem }; // Force reactivity
-                }
+                await axios.post(`/api/v1/news/${this.newsItem.id}/dislike/`);
+
             } catch (error) {
                 console.error("Error disliking news item:", error);
             }
@@ -120,7 +198,7 @@ export default {
                 console.error("Error deleting news item:", error);
                 alert("Failed to delete news item.");
             }
-        }
-    }
+        },
+    },
 };
 </script>
