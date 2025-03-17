@@ -139,7 +139,8 @@ export default {
                     this.newsItem.dislikes = data.dislikes;
                 }
                 if (data.type === 'comment_added') {
-                    this.comments.push(data.comment)
+                    // this.comments.push(data.comment)
+                    this.comments = data.comment
                 }
             };
 
